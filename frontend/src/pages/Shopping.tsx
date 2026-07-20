@@ -8,8 +8,12 @@ import {
   Trash2,
   ShoppingBag,
   Sparkles,
+  X,
+  Wand2,
 } from 'lucide-react';
 import { EmptyState } from '../components/PremiumUI';
+import { usePantry } from '../context/PantryContext';
+import { matchRecipe } from '../lib/kitchenAI';
 
 interface ShoppingItem {
   id: number;
@@ -20,20 +24,7 @@ interface ShoppingItem {
   checked: boolean;
 }
 
-const initialItems: ShoppingItem[] = [
-  { id: 1, name: 'Pasta', category: 'Dry Goods', quantity: '1 lb', price: 2.99, checked: false },
-  { id: 2, name: 'Olive Oil', category: 'Pantry', quantity: '1 bottle', price: 8.99, checked: false },
-  { id: 3, name: 'Garlic', category: 'Produce', quantity: '1 head', price: 0.99, checked: true },
-  { id: 4, name: 'Soy Sauce', category: 'Asian', quantity: '1 bottle', price: 4.99, checked: false },
-  { id: 5, name: 'Ginger', category: 'Produce', quantity: '2 oz', price: 1.49, checked: false },
-  { id: 6, name: 'Sesame Oil', category: 'Asian', quantity: '1 bottle', price: 6.99, checked: false },
-  { id: 7, name: 'Butter', category: 'Dairy', quantity: '1 stick', price: 2.49, checked: true },
-  { id: 8, name: 'Bread', category: 'Bakery', quantity: '1 loaf', price: 3.99, checked: false },
-  { id: 9, name: 'Lemon', category: 'Produce', quantity: '3 pieces', price: 1.99, checked: false },
-  { id: 10, name: 'Cucumber', category: 'Produce', quantity: '2 pieces', price: 1.49, checked: true },
-];
-
-const categories = ['Produce', 'Dairy', 'Pantry', 'Dry Goods', 'Asian', 'Bakery'];
+const categories = ['Produce', 'Dairy', 'Pantry', 'Dry Goods', 'Asian', 'Bakery', 'Other'];
 
 interface ShoppingItemCardProps {
   item: ShoppingItem;
@@ -115,19 +106,174 @@ function ShoppingItemCard({ item, onToggle, onDelete }: ShoppingItemCardProps) {
   );
 }
 
-export function Shopping() {
-  const [items, setItems] = useState<ShoppingItem[]>(initialItems);
+function AddItemModal({ isOpen, onClose, onAdd }: { isOpen: boolean; onClose: () => void; onAdd: (item: Omit<ShoppingItem, 'id' | 'checked'>) => void }) {
+  const [name, setName] = useState('');
+  const [category, setCategory] = useState('Other');
+  const [quantity, setQuantity] = useState('1');
+  const [price, setPrice] = useState('0');
 
-  const toggleItem = (id: number) => {
-    setItems((prev) =>
-      prev.map((item) =>
-        item.id === id ? { ...item, checked: !item.checked } : item
-      )
-    );
+  const reset = () => {
+    setName('');
+    setCategory('Other');
+    setQuantity('1');
+    setPrice('0');
   };
 
-  const deleteItem = (id: number) => {
-    setItems((prev) => prev.filter((item) => item.id !== id));
+  const handleClose = () => {
+    reset();
+    onClose();
+  };
+
+  const handleSubmit = () => {
+    if (!name.trim()) return;
+    onAdd({ name: name.trim(), category, quantity: quantity.trim() || '1', price: Number(price) || 0 });
+    reset();
+    onClose();
+  };
+
+  return (
+    <AnimatePresence>
+      {isOpen && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"
+          onClick={handleClose}
+        >
+          <motion.div
+            initial={{ scale: 0.9, opacity: 0, y: 30 }}
+            animate={{ scale: 1, opacity: 1, y: 0 }}
+            exit={{ scale: 0.9, opacity: 0, y: 30 }}
+            transition={{ type: 'spring', damping: 25, stiffness: 300 }}
+            onClick={(e) => e.stopPropagation()}
+            className="w-full max-w-sm bg-white dark:bg-gray-800 rounded-3xl shadow-2xl overflow-hidden"
+          >
+            <div className="relative p-6 bg-gradient-to-br from-emerald-500 to-teal-600">
+              <button
+                onClick={handleClose}
+                aria-label="Close"
+                className="absolute top-4 right-4 p-2 rounded-full bg-white/20 text-white hover:bg-white/30 transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 rounded-xl bg-white/20 flex items-center justify-center">
+                  <Plus className="w-6 h-6 text-white" />
+                </div>
+                <div>
+                  <h3 className="text-xl font-bold text-white">Add Item</h3>
+                  <p className="text-white/80 text-sm">Add something to your list</p>
+                </div>
+              </div>
+            </div>
+
+            <div className="p-6 space-y-4">
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Item Name</label>
+                <input
+                  type="text"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  placeholder="e.g., Olive Oil"
+                  className="w-full px-4 py-3.5 rounded-xl border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-white focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none transition-all placeholder-gray-400"
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Quantity</label>
+                  <input
+                    type="text"
+                    value={quantity}
+                    onChange={(e) => setQuantity(e.target.value)}
+                    placeholder="1 bottle"
+                    className="w-full px-4 py-3.5 rounded-xl border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-white focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none transition-all placeholder-gray-400"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Price ($)</label>
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={price}
+                    onChange={(e) => setPrice(e.target.value)}
+                    className="w-full px-4 py-3.5 rounded-xl border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-white focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none transition-all placeholder-gray-400"
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Category</label>
+                <select
+                  value={category}
+                  onChange={(e) => setCategory(e.target.value)}
+                  className="w-full px-4 py-3.5 rounded-xl border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-white focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none transition-all appearance-none cursor-pointer"
+                >
+                  {categories.map((c) => (
+                    <option key={c} value={c}>{c}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            <div className="px-6 pb-6">
+              <motion.button
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
+                onClick={handleSubmit}
+                disabled={!name.trim()}
+                className="w-full inline-flex items-center justify-center gap-2 py-4 text-base font-semibold text-white rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 shadow-lg shadow-emerald-500/25 hover:shadow-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <Plus className="w-5 h-5" />
+                Add Item
+              </motion.button>
+            </div>
+          </motion.div>
+        </motion.div>
+      )}
+    </AnimatePresence>
+  );
+}
+
+export function Shopping() {
+  const { shoppingItems: items, toggleShoppingItem, removeShoppingItem, addShoppingItem, addShoppingItems, clearShoppingList, mealPlan, pantryItems } = usePantry();
+  const [isAddOpen, setIsAddOpen] = useState(false);
+
+  const toggleItem = (id: number) => toggleShoppingItem(id);
+  const deleteItem = (id: number) => removeShoppingItem(id);
+
+  const handleGenerateFromPlan = () => {
+    // Collect every ingredient needed across the whole planned week...
+    const neededNames = new Set<string>();
+    mealPlan.forEach((day) => {
+      [day.breakfast, day.lunch, day.dinner].forEach((meal) => {
+        if (!meal) return;
+        const { missing } = matchRecipe(meal, pantryItems);
+        missing.forEach((ing) => neededNames.add(ing));
+      });
+    });
+
+    const toAdd = Array.from(neededNames).map((name) => ({
+      name,
+      category: 'Other',
+      quantity: '1',
+      price: 0,
+    }));
+
+    if (toAdd.length > 0) {
+      addShoppingItems(toAdd);
+    }
+  };
+
+  const handleDownload = () => {
+    const lines = items.map((i) => `${i.checked ? '[x]' : '[ ]'} ${i.name} — ${i.quantity} ($${i.price.toFixed(2)})`);
+    const blob = new Blob([`SmartSpoon Shopping List\n\n${lines.join('\n')}`], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'smartspoon-shopping-list.txt';
+    a.click();
+    URL.revokeObjectURL(url);
   };
 
   const checkedCount = items.filter((item) => item.checked).length;
@@ -236,19 +382,32 @@ export function Shopping() {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.15 }}
-          className="flex gap-3 mb-8"
+          className="flex flex-wrap gap-3 mb-8"
         >
           <motion.button
             whileHover={{ scale: 1.02 }}
             whileTap={{ scale: 0.98 }}
-            className="flex-1 inline-flex items-center justify-center gap-2 py-4 px-6 text-base font-semibold text-white rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 shadow-lg shadow-emerald-500/25 hover:shadow-xl transition-all"
+            onClick={handleGenerateFromPlan}
+            className="flex-1 min-w-[200px] inline-flex items-center justify-center gap-2 py-4 px-6 text-base font-semibold text-white rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 shadow-lg shadow-emerald-500/25 hover:shadow-xl transition-all"
           >
-            <Download className="w-5 h-5" />
-            Download List
+            <Wand2 className="w-5 h-5" />
+            Generate from Meal Plan
           </motion.button>
           <motion.button
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
+            onClick={handleDownload}
+            disabled={items.length === 0}
+            aria-label="Download list"
+            className="py-4 px-5 rounded-xl bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:border-emerald-300 dark:hover:border-emerald-600 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            <Download className="w-5 h-5" />
+          </motion.button>
+          <motion.button
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+            onClick={() => setIsAddOpen(true)}
+            aria-label="Add item"
             className="py-4 px-5 rounded-xl bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:border-emerald-300 dark:hover:border-emerald-600 transition-all"
           >
             <Plus className="w-5 h-5" />
@@ -256,8 +415,10 @@ export function Shopping() {
           <motion.button
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
-            onClick={() => setItems([])}
-            className="py-4 px-5 rounded-xl bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/30 transition-all"
+            onClick={clearShoppingList}
+            disabled={items.length === 0}
+            aria-label="Clear list"
+            className="py-4 px-5 rounded-xl bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/30 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
           >
             <Trash2 className="w-5 h-5" />
           </motion.button>
@@ -310,6 +471,8 @@ export function Shopping() {
             </AnimatePresence>
           </div>
         )}
+
+        <AddItemModal isOpen={isAddOpen} onClose={() => setIsAddOpen(false)} onAdd={addShoppingItem} />
       </div>
     </div>
   );

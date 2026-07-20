@@ -1,33 +1,22 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Search, Plus, Clock, AlertTriangle, CheckCircle, X, AlertCircle, UtensilsCrossed } from 'lucide-react';
+import { Search, Plus, Clock, AlertTriangle, CheckCircle, X, AlertCircle, UtensilsCrossed, Trash2 } from 'lucide-react';
 import { EmptyState } from '../components/PremiumUI';
-https://images.pexels.com/photos/161514/pexels-photo-161514.jpeg?auto=compress&cs=tinysrgb&w=300
+import { usePantry } from '../context/PantryContext';
+import type { PantryItem } from '../lib/kitchenAI';
+
 type Freshness = 'fresh' | 'warning' | 'expired';
 type Category = 'all' | 'Meat' | 'Vegetables' | 'Dairy' | 'Seafood';
 
-interface Ingredient {
-  id: number;
-  name: string;
-  category: string;
-  quantity: number;
-  unit: string;
-  expiry: number;
-  image: string;
-}
-
-const ingredients: Ingredient[] = [
-  { id: 1, name: 'Chicken Breast', category: 'Meat', quantity: 2, unit: 'lbs', expiry: 3, image: 'https://images.pexels.com/photos/5769373/pexels-photo-5769373.jpeg?auto=compress&cs=tinysrgb&w=300' },
-  { id: 2, name: 'Broccoli', category: 'Vegetables', quantity: 1, unit: 'head', expiry: 5, image: 'https://images.pexels.com/photos/3727689/pexels-photo-3727689.jpeg?auto=compress&cs=tinysrgb&w=300' },
-  { id: 3, name: 'Milk', category: 'Dairy', quantity: 1, unit: 'gallon', expiry: 7, image: 'https://images.pexels.com/photos/236010/pexels-photo-236010.jpeg?auto=compress&cs=tinysrgb&w=300' },
-  { id: 4, name: 'Eggs', category: 'Dairy', quantity: 12, unit: 'eggs', expiry: 14, image: 'https://images.pexels.com/photos/12969328/pexels-photo-12969328.jpeg?auto=compress&cs=tinysrgb&w=300' },
-  { id: 5, name: 'Tomatoes', category: 'Vegetables', quantity: 4, unit: 'pieces', expiry: 2, image: 'https://images.pexels.com/photos/7522774/pexels-photo-7522774.jpeg?auto=compress&cs=tinysrgb&w=300' },
-  { id: 6, name: 'Greek Yogurt', category: 'Dairy', quantity: 2, unit: 'cups', expiry: 10, image: 'https://images.pexels.com/photos/29516115/pexels-photo-29516115.jpeg?auto=compress&cs=tinysrgb&w=300' },
-  { id: 7, name: 'Salmon Fillet', category: 'Seafood', quantity: 1, unit: 'lb', expiry: 1, image: 'https://images.pexels.com/photos/5014596/pexels-photo-5014596.jpeg?auto=compress&cs=tinysrgb&w=300' },
-  { id: 8, name: 'Spinach', category: 'Vegetables', quantity: 1, unit: 'bag', expiry: 4, image: 'https://images.pexels.com/photos/19957370/pexels-photo-19957370.jpeg?auto=compress&cs=tinysrgb&w=300' },
-  { id: 9, name: 'Cheddar Cheese', category: 'Dairy', quantity: 8, unit: 'oz', expiry: 30, image: 'https://images.pexels.com/photos/6004715/pexels-photo-6004715.jpeg?auto=compress&cs=tinysrgb&w=300' },
-  { id: 10, name: 'Bell Peppers', category: 'Vegetables', quantity: 3, unit: 'pieces', expiry: 6, image: 'https://images.pexels.com/photos/594137/pexels-photo-594137.jpeg?auto=compress&cs=tinysrgb&w=300' },
-];
+// Fallback photo per category, used when a user adds an ingredient by hand
+// (no image upload in this frontend-only build — a backend/AI teammate can
+// later replace this with a real image lookup or upload).
+const CATEGORY_FALLBACK_IMAGE: Record<string, string> = {
+  Meat: 'https://images.pexels.com/photos/5769373/pexels-photo-5769373.jpeg?auto=compress&cs=tinysrgb&w=300',
+  Vegetables: 'https://images.pexels.com/photos/161514/pexels-photo-161514.jpeg?auto=compress&cs=tinysrgb&w=300',
+  Dairy: 'https://images.pexels.com/photos/236010/pexels-photo-236010.jpeg?auto=compress&cs=tinysrgb&w=300',
+  Seafood: 'https://images.pexels.com/photos/11871406/pexels-photo-11871406.jpeg?auto=compress&cs=tinysrgb&w=300',
+};
 
 function getFreshness(days: number): Freshness {
   if (days < 3) return 'expired';
@@ -65,7 +54,40 @@ function FreshnessBadge({ days }: { days: number }) {
   );
 }
 
-function AddIngredientModal({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) {
+function AddIngredientModal({ isOpen, onClose, onAdd }: { isOpen: boolean; onClose: () => void; onAdd: (item: Omit<PantryItem, 'id'>) => void }) {
+  const [name, setName] = useState('');
+  const [quantity, setQuantity] = useState('1');
+  const [unit, setUnit] = useState('pieces');
+  const [category, setCategory] = useState('Vegetables');
+  const [expiry, setExpiry] = useState('7');
+
+  const resetForm = () => {
+    setName('');
+    setQuantity('1');
+    setUnit('pieces');
+    setCategory('Vegetables');
+    setExpiry('7');
+  };
+
+  const handleClose = () => {
+    resetForm();
+    onClose();
+  };
+
+  const handleSubmit = () => {
+    if (!name.trim()) return;
+    onAdd({
+      name: name.trim(),
+      category,
+      quantity: Number(quantity) || 1,
+      unit,
+      expiry: Number(expiry) || 7,
+      image: CATEGORY_FALLBACK_IMAGE[category] ?? CATEGORY_FALLBACK_IMAGE.Vegetables,
+    });
+    resetForm();
+    onClose();
+  };
+
   return (
     <AnimatePresence>
       {isOpen && (
@@ -74,7 +96,7 @@ function AddIngredientModal({ isOpen, onClose }: { isOpen: boolean; onClose: () 
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
           className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"
-          onClick={onClose}
+          onClick={handleClose}
         >
           <motion.div
             initial={{ scale: 0.9, opacity: 0, y: 30 }}
@@ -88,7 +110,8 @@ function AddIngredientModal({ isOpen, onClose }: { isOpen: boolean; onClose: () 
             <div className="relative p-6 bg-gradient-to-br from-emerald-500 to-teal-600">
               <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAiIGhlaWdodD0iMjAiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PGRlZnM+PHBhdHRlcm4gaWQ9ImdyaWQiIHdpZHRoPSIyMCIgaGVpZ2h0PSIyMCIgcGF0dGVyblVuaXRzPSJ1c2VyU3BhY2VPblVzZSI+PGNpcmNsZSBjeD0iMSIgY3k9IjEiIHI9IjEiIGZpbGw9IndoaXRlIiBmaWxsLW9wYWNpdHk9IjAuMSIvPjwvcGF0dGVybj48L2RlZnM+PHJlY3Qgd2lkdGg9IjEwMCUiIGhlaWdodD0iMTAwJSIgZmlsbD0idXJsKCNncmlkKSIvPjwvc3ZnPg==')] opacity-30" />
               <button
-                onClick={onClose}
+                onClick={handleClose}
+                aria-label="Close"
                 className="absolute top-4 right-4 p-2 rounded-full bg-white/20 text-white hover:bg-white/30 transition-colors"
               >
                 <X className="w-5 h-5" />
@@ -112,6 +135,8 @@ function AddIngredientModal({ isOpen, onClose }: { isOpen: boolean; onClose: () 
                 </label>
                 <input
                   type="text"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
                   placeholder="e.g., Chicken Breast"
                   className="w-full px-4 py-3.5 rounded-xl border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-white focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none transition-all placeholder-gray-400"
                 />
@@ -124,6 +149,9 @@ function AddIngredientModal({ isOpen, onClose }: { isOpen: boolean; onClose: () 
                   </label>
                   <input
                     type="number"
+                    min="0"
+                    value={quantity}
+                    onChange={(e) => setQuantity(e.target.value)}
                     placeholder="1"
                     className="w-full px-4 py-3.5 rounded-xl border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-white focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none transition-all placeholder-gray-400"
                   />
@@ -132,11 +160,15 @@ function AddIngredientModal({ isOpen, onClose }: { isOpen: boolean; onClose: () 
                   <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
                     Unit
                   </label>
-                  <select className="w-full px-4 py-3.5 rounded-xl border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-white focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none transition-all appearance-none cursor-pointer">
-                    <option>lbs</option>
-                    <option>pieces</option>
-                    <option>cups</option>
-                    <option>oz</option>
+                  <select
+                    value={unit}
+                    onChange={(e) => setUnit(e.target.value)}
+                    className="w-full px-4 py-3.5 rounded-xl border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-white focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none transition-all appearance-none cursor-pointer"
+                  >
+                    <option value="lbs">lbs</option>
+                    <option value="pieces">pieces</option>
+                    <option value="cups">cups</option>
+                    <option value="oz">oz</option>
                   </select>
                 </div>
               </div>
@@ -145,11 +177,15 @@ function AddIngredientModal({ isOpen, onClose }: { isOpen: boolean; onClose: () 
                 <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
                   Category
                 </label>
-                <select className="w-full px-4 py-3.5 rounded-xl border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-white focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none transition-all appearance-none cursor-pointer">
-                  <option>Vegetables</option>
-                  <option>Meat</option>
-                  <option>Dairy</option>
-                  <option>Seafood</option>
+                <select
+                  value={category}
+                  onChange={(e) => setCategory(e.target.value)}
+                  className="w-full px-4 py-3.5 rounded-xl border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-white focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none transition-all appearance-none cursor-pointer"
+                >
+                  <option value="Vegetables">Vegetables</option>
+                  <option value="Meat">Meat</option>
+                  <option value="Dairy">Dairy</option>
+                  <option value="Seafood">Seafood</option>
                 </select>
               </div>
 
@@ -161,6 +197,9 @@ function AddIngredientModal({ isOpen, onClose }: { isOpen: boolean; onClose: () 
                   <Clock className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
                   <input
                     type="number"
+                    min="0"
+                    value={expiry}
+                    onChange={(e) => setExpiry(e.target.value)}
                     placeholder="7"
                     className="w-full pl-12 pr-4 py-3.5 rounded-xl border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-white focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none transition-all placeholder-gray-400"
                   />
@@ -173,8 +212,9 @@ function AddIngredientModal({ isOpen, onClose }: { isOpen: boolean; onClose: () 
               <motion.button
                 whileHover={{ scale: 1.02 }}
                 whileTap={{ scale: 0.98 }}
-                onClick={onClose}
-                className="w-full inline-flex items-center justify-center gap-2 py-4 text-base font-semibold text-white rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 shadow-lg shadow-emerald-500/25 hover:shadow-xl transition-all"
+                onClick={handleSubmit}
+                disabled={!name.trim()}
+                className="w-full inline-flex items-center justify-center gap-2 py-4 text-base font-semibold text-white rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 shadow-lg shadow-emerald-500/25 hover:shadow-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:shadow-none"
               >
                 <Plus className="w-5 h-5" />
                 Add to Pantry
@@ -187,7 +227,7 @@ function AddIngredientModal({ isOpen, onClose }: { isOpen: boolean; onClose: () 
   );
 }
 
-function IngredientCard({ ingredient, onClick }: { ingredient: Ingredient; onClick?: () => void }) {
+function IngredientCard({ ingredient, onClick, onDelete }: { ingredient: PantryItem; onClick?: () => void; onDelete: () => void }) {
   const freshness = getFreshness(ingredient.expiry);
   const isHovered = useState(false);
   const [hovered, setHovered] = isHovered;
@@ -223,6 +263,18 @@ function IngredientCard({ ingredient, onClick }: { ingredient: Ingredient; onCli
           <div className="absolute top-3 right-3">
             <FreshnessBadge days={ingredient.expiry} />
           </div>
+
+          {/* Delete button */}
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onDelete();
+            }}
+            aria-label={`Remove ${ingredient.name} from pantry`}
+            className="absolute top-3 left-3 w-7 h-7 rounded-full bg-black/40 backdrop-blur-sm text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-500/80"
+          >
+            <Trash2 className="w-3.5 h-3.5" />
+          </button>
 
           {/* Category */}
           <div className="absolute bottom-3 left-3 px-2.5 py-1 rounded-lg bg-white/20 backdrop-blur-sm text-white text-xs font-medium">
@@ -274,11 +326,12 @@ function IngredientCard({ ingredient, onClick }: { ingredient: Ingredient; onCli
 }
 
 export function Pantry() {
+  const { pantryItems, addPantryItem, removePantryItem } = usePantry();
   const [search, setSearch] = useState('');
   const [category, setCategory] = useState<Category>('all');
   const [isModalOpen, setIsModalOpen] = useState(false);
 
-  const filteredIngredients = ingredients.filter((ing) => {
+  const filteredIngredients = pantryItems.filter((ing) => {
     const matchesSearch = ing.name.toLowerCase().includes(search.toLowerCase());
     const matchesCategory = category === 'all' || ing.category === category;
     return matchesSearch && matchesCategory;
@@ -287,9 +340,9 @@ export function Pantry() {
   const categories: Category[] = ['all', 'Meat', 'Vegetables', 'Dairy', 'Seafood'];
 
   const stats = {
-    total: ingredients.length,
-    warning: ingredients.filter((i) => getFreshness(i.expiry) === 'warning').length,
-    expired: ingredients.filter((i) => getFreshness(i.expiry) === 'expired').length,
+    total: pantryItems.length,
+    warning: pantryItems.filter((i) => getFreshness(i.expiry) === 'warning').length,
+    expired: pantryItems.filter((i) => getFreshness(i.expiry) === 'expired').length,
   };
 
   return (
@@ -396,6 +449,7 @@ export function Pantry() {
                 <IngredientCard
                   key={ingredient.id}
                   ingredient={ingredient}
+                  onDelete={() => removePantryItem(ingredient.id)}
                 />
               ))}
             </AnimatePresence>
@@ -418,7 +472,7 @@ export function Pantry() {
           </motion.div>
         </motion.button>
 
-        <AddIngredientModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} />
+        <AddIngredientModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} onAdd={addPantryItem} />
       </div>
     </div>
   );
