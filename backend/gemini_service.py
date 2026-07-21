@@ -15,6 +15,7 @@ load_dotenv()
 logger = logging.getLogger(__name__)
 
 GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
+GEMINI_TIMEOUT_MS = int(os.getenv("GEMINI_TIMEOUT_MS", "25000"))
 
 RECIPE_SCHEMA = {
     "type": "object",
@@ -36,16 +37,25 @@ class GeminiResponseError(Exception):
     """Gemini returned a response that cannot safely be used."""
 
 
-def _get_client() -> genai.Client:
+def _get_client(request_id: str) -> genai.Client:
     """Create the SDK client only when a request needs it.
 
     Importing this module must not crash a Railway instance when an environment
     variable is absent; the API can then return a useful 503 instead.
     """
+    logger.info("request_id=%s Gemini client initialization started", request_id)
     api_key = os.getenv("GEMINI_API_KEY", "").strip()
     if not api_key or api_key == "your_gemini_api_key_here":
         raise GeminiConfigurationError("GEMINI_API_KEY is not configured.")
-    return genai.Client(api_key=api_key)
+    client = genai.Client(
+        api_key=api_key,
+        http_options=types.HttpOptions(
+            timeout=GEMINI_TIMEOUT_MS,
+            retry_options=types.HttpRetryOptions(attempts=1),
+        ),
+    )
+    logger.info("request_id=%s Gemini client initialization completed", request_id)
+    return client
 
 
 def _extract_json(text: str) -> dict[str, Any]:
@@ -101,17 +111,20 @@ def _format_recipe(payload: dict[str, Any]) -> str:
     )
 
 
-def generate_recipe(ingredients: list[str]) -> str:
+def generate_recipe(ingredients: list[str], request_id: str = "-") -> str:
     """Generate a display-ready recipe from a validated ingredient list."""
+    logger.info("request_id=%s Gemini prompt creation started", request_id)
     prompt = (
         "Create one practical, easy recipe using as many of these ingredients as possible: "
         f"{', '.join(ingredients)}. "
         "Return only JSON matching the requested schema. Do not invent unsafe cooking advice."
     )
+    logger.info("request_id=%s Gemini prompt creation completed", request_id)
     try:
         # Keep the client strongly referenced until the request completes. The
         # SDK owns an HTTP client and can otherwise be finalized too early.
-        client = _get_client()
+        client = _get_client(request_id)
+        logger.info("request_id=%s Gemini API call started model=%s timeout_ms=%d", request_id, GEMINI_MODEL, GEMINI_TIMEOUT_MS)
         response = client.models.generate_content(
             model=GEMINI_MODEL,
             contents=prompt,
@@ -121,13 +134,17 @@ def generate_recipe(ingredients: list[str]) -> str:
                 temperature=0.4,
             ),
         )
+        logger.info("request_id=%s Gemini API call completed", request_id)
         text = response.text
     except GeminiConfigurationError:
         raise
     except Exception as exc:
-        logger.exception("Gemini generation failed", extra={"model": GEMINI_MODEL})
+        logger.exception("request_id=%s Gemini API call failed model=%s", request_id, GEMINI_MODEL)
         raise GeminiResponseError("The AI recipe service is unavailable.") from exc
 
+    logger.info("request_id=%s Gemini response parsing started", request_id)
     if not text or not text.strip():
         raise GeminiResponseError("The AI recipe service returned an empty response.")
-    return _format_recipe(_extract_json(text))
+    recipe = _format_recipe(_extract_json(text))
+    logger.info("request_id=%s Gemini response parsing completed", request_id)
+    return recipe
