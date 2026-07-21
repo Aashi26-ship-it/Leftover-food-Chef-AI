@@ -13,6 +13,6 @@ services:
     build: ./frontend
     container_name: leftover-frontend
     ports:
-      - "5173:5173"
+      - "5173:4173"
     depends_on:
       - backend

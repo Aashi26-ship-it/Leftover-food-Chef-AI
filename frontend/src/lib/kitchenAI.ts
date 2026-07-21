@@ -117,8 +117,12 @@ export async function generateAIRecipe(ingredients: string[]) {
 
     if (!response.ok) {
       const errorBody: unknown = await response.json().catch(() => null);
-      const detail = typeof errorBody === 'object' && errorBody !== null && 'detail' in errorBody && typeof errorBody.detail === 'string'
-        ? errorBody.detail
+      const detail = typeof errorBody === 'object' && errorBody !== null
+        ? ('detail' in errorBody && typeof errorBody.detail === 'string'
+          ? errorBody.detail
+          : 'error' in errorBody && typeof errorBody.error === 'object' && errorBody.error !== null && 'message' in errorBody.error && typeof errorBody.error.message === 'string'
+            ? errorBody.error.message
+            : `Request failed with status ${response.status}.`)
         : `Request failed with status ${response.status}.`;
       throw new Error(detail);
     }

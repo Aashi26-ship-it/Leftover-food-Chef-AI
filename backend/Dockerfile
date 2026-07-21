@@ -11,4 +11,4 @@ COPY . .
 EXPOSE 8000
 
 # Railway supplies PORT at runtime. The fallback keeps docker-compose/local runs simple.
-CMD ["sh", "-c", "uvicorn main:app --host 0.0.0.0 --port ${PORT:-8000}"]
+CMD ["sh", "-c", "exec uvicorn main:app --host 0.0.0.0 --port ${PORT:-8000}"]
