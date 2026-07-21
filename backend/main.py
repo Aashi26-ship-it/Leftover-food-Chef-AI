@@ -166,6 +166,6 @@ async def agent_recipe(request: Request, ingredients: IngredientsQuery) -> dict[
     logger.info("request_id=%s endpoint=/agent-recipe query parsing started", request_id)
     parsed_ingredients = parse_ingredients(ingredients)
     logger.info("request_id=%s endpoint=/agent-recipe query parsing completed ingredient_count=%d", request_id, len(parsed_ingredients))
-    result = await execute_recipe_request(lambda: run_agents(parsed_ingredients, request_id), "/agent-recipe", request_id)
+    result = await execute_recipe_request(lambda: run_agents(parsed_ingredients), "/agent-recipe", request_id)
     logger.info("request_id=%s endpoint=/agent-recipe JSON response ready", request_id)
     return result
