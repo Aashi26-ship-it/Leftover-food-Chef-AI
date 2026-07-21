@@ -1,3 +1,4 @@
+import { generateAIRecipe } from "../lib/kitchenAI";
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
@@ -441,17 +442,58 @@ export function Recipes() {
   const [isThinking, setIsThinking] = useState(false);
   const [suggestions, setSuggestions] = useState<ReturnType<typeof rankRecipesForPantry> | null>(null);
 
-  const handleAskAI = () => {
-    setIsThinking(true);
+const handleGenerate = async () => {
+      setIsThinking(true);
     setSuggestions(null);
     // Simulated "thinking" delay — the actual ranking below runs entirely
     // client-side today. A backend/AI teammate can later replace this
     // whole handler with a real API call without changing the UI.
-    setTimeout(() => {
-      const ranked = rankRecipesForPantry(recipes, pantryItems).slice(0, 3);
-      setSuggestions(ranked);
-      setIsThinking(false);
-    }, 1100);
+    try {
+  setIsThinking(true);
+
+  const ingredients = pantryItems.map((item) => item.name);
+
+  const aiRecipe = await generateAIRecipe(ingredients);
+  console.log("AI RESPONSE:", aiRecipe);
+
+  setSuggestions([
+    {
+      recipe: {
+        id: Date.now(),
+        name: "AI Generated Recipe",
+        description: aiRecipe,
+        image: "",
+        time: 30,
+        calories: 0,
+        servings: 2,
+        difficulty: "Easy",
+        tags: ["AI", "Leftover"],
+        ingredients,
+        steps: [aiRecipe],
+        nutrition: {
+          protein: 0,
+          carbs: 0,
+          fat: 0,
+          fiber: 0,
+        },
+      },
+      match: {
+        haveCount: ingredients.length,
+        totalCount: ingredients.length,
+        matchPercent: 100,
+        have: ingredients,
+        missing: [],
+      },
+      usesExpiring: 0,
+      score: 100,
+    },
+  ]);
+
+} catch (error) {
+  console.log(error);
+} finally {
+  setIsThinking(false);
+}
   };
 
   const filteredRecipes = recipes.filter((recipe) => {
@@ -518,7 +560,7 @@ export function Recipes() {
             <motion.button
               whileHover={{ scale: 1.03 }}
               whileTap={{ scale: 0.97 }}
-              onClick={handleAskAI}
+              onClick={handleGenerate}
               disabled={isThinking}
               className="inline-flex items-center gap-2 px-6 py-3.5 rounded-xl bg-white text-emerald-600 font-semibold shadow-lg hover:shadow-xl transition-all disabled:opacity-70 flex-shrink-0 w-full sm:w-auto justify-center"
             >

@@ -107,13 +107,3 @@ export function rankRecipesForPantry(recipes: Recipe[], pantryItems: PantryItem[
     })
     .sort((a, b) => b.score - a.score);
 }
-export async function generateAIRecipe(ingredients: string[]) {
-  const response = await fetch(
-    "https://leftover-food-chef-ai-production.up.railway.app/agent-recipe?ingredients=" +
-      encodeURIComponent(ingredients.join(","))
-  );
-
-  const data = await response.json();
-
-  return data.recipe;
-}
