@@ -352,22 +352,34 @@ export function Pantry() {
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="mb-8"
+          className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8"
         >
-          <motion.span
-            initial={{ opacity: 0, scale: 0.9 }}
-            animate={{ opacity: 1, scale: 1 }}
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 text-sm font-medium mb-4"
+          <div>
+            <motion.span
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 text-sm font-medium mb-4"
+            >
+              <UtensilsCrossed className="w-4 h-4" />
+              My Pantry
+            </motion.span>
+            <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-gray-900 dark:text-white mb-2">
+              Pantry Inventory
+            </h1>
+            <p className="text-lg text-gray-600 dark:text-gray-400 max-w-2xl">
+              Track your ingredients, monitor freshness, and never let food go to waste
+            </p>
+          </div>
+
+          <motion.button
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
+            onClick={() => setIsModalOpen(true)}
+            className="flex items-center gap-2 px-5 py-3 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 text-white font-semibold shadow-md shadow-emerald-500/20 hover:shadow-lg transition-all cursor-pointer text-sm self-start md:self-auto"
           >
-            <UtensilsCrossed className="w-4 h-4" />
-            My Pantry
-          </motion.span>
-          <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-gray-900 dark:text-white mb-2">
-            Pantry Inventory
-          </h1>
-          <p className="text-lg text-gray-600 dark:text-gray-400 max-w-2xl">
-            Track your ingredients, monitor freshness, and never let food go to waste
-          </p>
+            <Plus className="w-4 h-4" />
+            <span>Add Ingredient</span>
+          </motion.button>
         </motion.div>
 
         {/* Stats Cards */}
@@ -461,7 +473,7 @@ export function Pantry() {
           whileHover={{ scale: 1.1 }}
           whileTap={{ scale: 0.9 }}
           onClick={() => setIsModalOpen(true)}
-          className="fixed bottom-6 right-5 sm:bottom-8 sm:right-8 w-14 h-14 sm:w-16 sm:h-16 rounded-full bg-gradient-to-r from-emerald-500 to-teal-500 text-white shadow-xl shadow-emerald-500/30 flex items-center justify-center z-40 hover:shadow-2xl hover:shadow-emerald-500/40 transition-all"
+          className="fixed bottom-6 right-5 sm:bottom-8 sm:right-8 w-14 h-14 sm:w-16 sm:h-16 rounded-full bg-gradient-to-r from-emerald-500 to-teal-500 text-white shadow-xl shadow-emerald-500/30 flex items-center justify-center z-40 hover:shadow-2xl hover:shadow-emerald-500/40 transition-all lg:hidden"
           aria-label="Add ingredient"
         >
           <motion.div

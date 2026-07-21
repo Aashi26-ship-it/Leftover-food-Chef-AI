@@ -9,7 +9,7 @@ from .shopping_agent import shopping_agent
 
 
 class AgentState(TypedDict):
-    ingredients: str
+    ingredients: list[str]
     pantry: dict
     recipe: str
     meal_plan: dict
@@ -65,7 +65,7 @@ graph = workflow.compile()
 
 # -------- Run Graph --------
 
-def run_agents(ingredients: str):
+def run_agents(ingredients: list[str]) -> dict[str, object]:
 
     result = graph.invoke(
         {

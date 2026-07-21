@@ -108,12 +108,32 @@ export function rankRecipesForPantry(recipes: Recipe[], pantryItems: PantryItem[
     .sort((a, b) => b.score - a.score);
 }
 export async function generateAIRecipe(ingredients: string[]) {
-  const response = await fetch(
-    "https://leftover-food-chef-ai-production.up.railway.app/agent-recipe?ingredients=" +
-      encodeURIComponent(ingredients.join(","))
-  );
+  const apiBaseUrl = (import.meta.env.VITE_API_URL || "https://leftover-food-chef-ai-production.up.railway.app").replace(/\/$/, '');
 
-  const data = await response.json();
+  try {
+    const response = await fetch(
+      `${apiBaseUrl}/agent-recipe?ingredients=${encodeURIComponent(ingredients.join(","))}`
+    );
 
-  return data.recipe;
+    if (!response.ok) {
+      const errorBody: unknown = await response.json().catch(() => null);
+      const detail = typeof errorBody === 'object' && errorBody !== null && 'detail' in errorBody && typeof errorBody.detail === 'string'
+        ? errorBody.detail
+        : `Request failed with status ${response.status}.`;
+      throw new Error(detail);
+    }
+
+    const data = await response.json();
+
+    if (!data || typeof data.recipe !== "string") {
+      throw new Error("Invalid backend response: 'recipe' content was missing or empty.");
+    }
+
+    return data.recipe;
+  } catch (error) {
+    console.error("Error in generateAIRecipe:", error);
+    throw error instanceof Error
+      ? error
+      : new Error("An unexpected network error occurred while generating your recipe.");
+  }
 }
