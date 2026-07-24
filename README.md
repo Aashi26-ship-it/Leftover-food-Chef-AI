@@ -219,10 +219,10 @@ Add screenshots of:
 ## 👩‍💻 Team Members
 
 - Aashi Singh
-- Ragini
-- *(Add remaining team members)*
-
----
+- Ragini Soni
+- Shakti Rajora
+- Manshi Kadam
+- Mudu sunandita
 
 ## 📖 Project Objective
 
@@ -234,7 +234,6 @@ The primary objective of this project is to reduce food waste by helping users p
 
 This project is developed for educational purposes as part of a university project.
 
----
 
 ## ⭐ Acknowledgements
 
