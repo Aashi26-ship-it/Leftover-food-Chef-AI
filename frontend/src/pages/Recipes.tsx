@@ -1,3 +1,4 @@
+import { generateAIRecipe } from "../lib/kitchenAI";
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
@@ -13,9 +14,14 @@ import {
   Heart,
   Timer,
   ChefHat,
+  CheckCircle2,
+  Wand2,
+  Loader2,
 } from 'lucide-react';
 import { EmptyState } from '../components/PremiumUI';
 import { recipes as rawRecipes } from '../data';
+import { usePantry } from '../context/PantryContext';
+import { matchRecipe, getSubstitutes, rankRecipesForPantry } from '../lib/kitchenAI';
 
 type Difficulty = 'Easy' | 'Medium' | 'Hard';
 type DifficultyFilter = 'all' | Difficulty;
@@ -33,7 +39,6 @@ interface Recipe {
   ingredients: string[];
   steps: string[];
   nutrition: { protein: number; carbs: number; fat: number; fiber: number };
-  missing: string[];
 }
 
 const recipes = rawRecipes as Recipe[];
@@ -47,7 +52,10 @@ function RecipeModal({
   isOpen: boolean;
   onClose: () => void;
 }) {
+  const { pantryItems } = usePantry();
   if (!recipe) return null;
+
+  const match = matchRecipe(recipe, pantryItems);
 
   return (
     <AnimatePresence>
@@ -131,8 +139,23 @@ function RecipeModal({
               {/* Description */}
               <p className="text-gray-600 dark:text-gray-400 text-lg leading-relaxed">{recipe.description}</p>
 
-              {/* Missing Ingredients Alert */}
-              {recipe.missing.length > 0 && (
+              {/* Live pantry match */}
+              <div className="flex items-center gap-3 p-4 rounded-2xl bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800">
+                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-500 flex items-center justify-center flex-shrink-0">
+                  <CheckCircle2 className="w-5 h-5 text-white" />
+                </div>
+                <div>
+                  <p className="text-sm font-semibold text-emerald-700 dark:text-emerald-400">
+                    You have {match.haveCount} of {match.totalCount} ingredients
+                  </p>
+                  <p className="text-xs text-emerald-600/80 dark:text-emerald-400/70">
+                    Based on what's currently in your Pantry
+                  </p>
+                </div>
+              </div>
+
+              {/* Missing Ingredients + Substitutes */}
+              {match.missing.length > 0 && (
                 <motion.div
                   initial={{ opacity: 0, x: -20 }}
                   animate={{ opacity: 1, x: 0 }}
@@ -149,18 +172,27 @@ function RecipeModal({
                       Missing Ingredients
                     </span>
                   </div>
-                  <div className="flex flex-wrap gap-2">
-                    {recipe.missing.map((ing, i) => (
-                      <motion.span
-                        key={ing}
-                        initial={{ opacity: 0, scale: 0.8 }}
-                        animate={{ opacity: 1, scale: 1 }}
-                        transition={{ delay: 0.1 * i }}
-                        className="px-3 py-1.5 rounded-full text-sm bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 font-medium"
-                      >
-                        + {ing}
-                      </motion.span>
-                    ))}
+                  <div className="space-y-2.5">
+                    {match.missing.map((ing, i) => {
+                      const subs = getSubstitutes(ing);
+                      return (
+                        <motion.div
+                          key={ing}
+                          initial={{ opacity: 0, scale: 0.95 }}
+                          animate={{ opacity: 1, scale: 1 }}
+                          transition={{ delay: 0.08 * i }}
+                        >
+                          <span className="inline-block px-3 py-1.5 rounded-full text-sm bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 font-medium mb-1.5">
+                            + {ing}
+                          </span>
+                          {subs.length > 0 && (
+                            <p className="text-xs text-amber-700/80 dark:text-amber-400/70 pl-1">
+                              Substitute with: {subs.join(', ')}
+                            </p>
+                          )}
+                        </motion.div>
+                      );
+                    })}
                   </div>
                 </motion.div>
               )}
@@ -267,6 +299,8 @@ function RecipeModal({
 function RecipeCard({ recipe, onClick }: { recipe: Recipe; onClick: () => void }) {
   const [isFavorite, setIsFavorite] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
+  const { pantryItems } = usePantry();
+  const match = matchRecipe(recipe, pantryItems);
 
   const difficultyColors = {
     Easy: 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400',
@@ -332,6 +366,22 @@ function RecipeCard({ recipe, onClick }: { recipe: Recipe; onClick: () => void }
             <Star className="w-3.5 h-3.5 text-yellow-400 fill-yellow-400" />
             <span className="text-xs text-white font-semibold">4.8</span>
           </div>
+
+          {/* Pantry match */}
+          <div
+            className={`absolute bottom-3 right-3 flex items-center gap-1.5 px-2.5 py-1.5 rounded-full backdrop-blur-sm ${
+              match.matchPercent === 100
+                ? 'bg-emerald-500/90'
+                : match.matchPercent >= 50
+                ? 'bg-amber-500/90'
+                : 'bg-white/20'
+            }`}
+          >
+            <CheckCircle2 className="w-3.5 h-3.5 text-white" />
+            <span className="text-xs text-white font-semibold">
+              {match.haveCount}/{match.totalCount} have
+            </span>
+          </div>
         </div>
 
         {/* Content */}
@@ -384,10 +434,67 @@ function RecipeCard({ recipe, onClick }: { recipe: Recipe; onClick: () => void }
 }
 
 export function Recipes() {
+  const { pantryItems } = usePantry();
   const [search, setSearch] = useState('');
   const [difficulty, setDifficulty] = useState<DifficultyFilter>('all');
   const [selectedRecipe, setSelectedRecipe] = useState<Recipe | null>(null);
   const [showModal, setShowModal] = useState(false);
+  const [isThinking, setIsThinking] = useState(false);
+  const [suggestions, setSuggestions] = useState<ReturnType<typeof rankRecipesForPantry> | null>(null);
+
+const handleGenerate = async () => {
+      setIsThinking(true);
+    setSuggestions(null);
+    // Simulated "thinking" delay — the actual ranking below runs entirely
+    // client-side today. A backend/AI teammate can later replace this
+    // whole handler with a real API call without changing the UI.
+    try {
+  setIsThinking(true);
+
+  const ingredients = pantryItems.map((item) => item.name);
+
+  const aiRecipe = await generateAIRecipe(ingredients);
+  console.log("AI RESPONSE:", aiRecipe);
+
+  setSuggestions([
+    {
+      recipe: {
+        id: Date.now(),
+        name: "AI Generated Recipe",
+        description: aiRecipe,
+        image: "",
+        time: 30,
+        calories: 0,
+        servings: 2,
+        difficulty: "Easy",
+        tags: ["AI", "Leftover"],
+        ingredients,
+        steps: [aiRecipe],
+        nutrition: {
+          protein: 0,
+          carbs: 0,
+          fat: 0,
+          fiber: 0,
+        },
+      },
+      match: {
+        haveCount: ingredients.length,
+        totalCount: ingredients.length,
+        matchPercent: 100,
+        have: ingredients,
+        missing: [],
+      },
+      usesExpiring: 0,
+      score: 100,
+    },
+  ]);
+
+} catch (error) {
+  console.log(error);
+} finally {
+  setIsThinking(false);
+}
+  };
 
   const filteredRecipes = recipes.filter((recipe) => {
     const matchesSearch = recipe.name.toLowerCase().includes(search.toLowerCase()) ||
@@ -423,7 +530,112 @@ export function Recipes() {
           </p>
         </motion.div>
 
-        {/* Search and Filters */}
+        {/* Ask AI Panel */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.05 }}
+          className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-emerald-500 to-teal-600 p-6 sm:p-8 mb-8 shadow-lg shadow-emerald-500/20"
+        >
+          <div className="absolute top-0 right-0 w-64 h-64 bg-white/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/4" />
+          <div className="relative flex flex-col sm:flex-row items-start sm:items-center justify-between gap-5">
+            <div className="flex items-start gap-4">
+              <motion.div
+                animate={{ rotate: isThinking ? 360 : [0, -10, 10, 0] }}
+                transition={isThinking ? { duration: 1, repeat: Infinity, ease: 'linear' } : { duration: 2, repeat: Infinity }}
+                className="w-12 h-12 rounded-2xl bg-white/20 flex items-center justify-center flex-shrink-0"
+              >
+                <Wand2 className="w-6 h-6 text-white" />
+              </motion.div>
+              <div>
+                <h2 className="text-lg sm:text-xl font-bold text-white mb-1">
+                  What should I cook tonight?
+                </h2>
+                <p className="text-white/80 text-sm max-w-md">
+                  Let the Leftover Chef AI pick recipes that use what's already in your pantry — especially what's expiring soon.
+                </p>
+              </div>
+            </div>
+
+            <motion.button
+              whileHover={{ scale: 1.03 }}
+              whileTap={{ scale: 0.97 }}
+              onClick={handleGenerate}
+              disabled={isThinking}
+              className="inline-flex items-center gap-2 px-6 py-3.5 rounded-xl bg-white text-emerald-600 font-semibold shadow-lg hover:shadow-xl transition-all disabled:opacity-70 flex-shrink-0 w-full sm:w-auto justify-center"
+            >
+              {isThinking ? (
+                <>
+                  <Loader2 className="w-5 h-5 animate-spin" />
+                  Thinking...
+                </>
+              ) : (
+                <>
+                  <Sparkles className="w-5 h-5" />
+                  Suggest Recipes For Me
+                </>
+              )}
+            </motion.button>
+          </div>
+        </motion.div>
+
+        {/* AI Suggestions */}
+        <AnimatePresence>
+          {suggestions && suggestions.length > 0 && (
+            <motion.div
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: 'auto' }}
+              exit={{ opacity: 0, height: 0 }}
+              className="mb-8 overflow-hidden"
+            >
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-white flex items-center gap-2">
+                  <Sparkles className="w-5 h-5 text-emerald-500" />
+                  Suggested for you
+                </h3>
+                <button
+                  onClick={() => setSuggestions(null)}
+                  className="text-sm text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
+                >
+                  Clear
+                </button>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                {suggestions.map(({ recipe, match, usesExpiring }) => (
+                  <motion.button
+                    key={recipe.id}
+                    initial={{ opacity: 0, scale: 0.95 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    whileHover={{ y: -4 }}
+                    onClick={() => {
+                      setSelectedRecipe(recipe as Recipe);
+                      setShowModal(true);
+                    }}
+                    className="text-left relative overflow-hidden rounded-2xl border-2 border-emerald-200 dark:border-emerald-800 bg-white dark:bg-gray-800 shadow-sm hover:shadow-lg transition-all"
+                  >
+                    <div className="aspect-[16/9] relative">
+                      <img src={recipe.image} alt={recipe.name} className="w-full h-full object-cover" />
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent" />
+                      <div className="absolute bottom-2 left-3 right-3">
+                        <p className="text-white text-sm font-semibold line-clamp-1">{recipe.name}</p>
+                      </div>
+                    </div>
+                    <div className="p-3 flex items-center gap-2 flex-wrap">
+                      <span className="text-xs px-2 py-1 rounded-full bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 font-medium">
+                        {match.matchPercent}% match
+                      </span>
+                      {usesExpiring > 0 && (
+                        <span className="text-xs px-2 py-1 rounded-full bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 font-medium">
+                          Uses {usesExpiring} item{usesExpiring > 1 ? 's' : ''} expiring soon
+                        </span>
+                      )}
+                    </div>
+                  </motion.button>
+                ))}
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}

@@ -12,6 +12,9 @@ import {
   X,
   Trash2,
 } from 'lucide-react';
+import { recipes as rawRecipes } from '../data';
+import { usePantry } from '../context/PantryContext';
+import type { MealPlanDay } from '../context/PantryContext';
 
 interface Recipe {
   id: number;
@@ -25,91 +28,7 @@ interface Recipe {
   tags: string[];
 }
 
-const recipes: Recipe[] = [
-  {
-    id: 1,
-    name: 'Mediterranean Chicken Bowl',
-    description: 'Tender chicken with fresh vegetables',
-    image: 'https://images.pexels.com/photos/37233498/pexels-photo-37233498.jpeg?auto=compress&cs=tinysrgb&w=600',
-    time: 35,
-    calories: 450,
-    servings: 2,
-    difficulty: 'Easy',
-    tags: ['Healthy', 'High Protein'],
-  },
-  {
-    id: 2,
-    name: 'Creamy Spinach Pasta',
-    description: 'Rich and creamy pasta with fresh spinach',
-    image: 'https://images.pexels.com/photos/3214160/pexels-photo-3214160.jpeg?auto=compress&cs=tinysrgb&w=600',
-    time: 25,
-    calories: 520,
-    servings: 4,
-    difficulty: 'Easy',
-    tags: ['Vegetarian'],
-  },
-  {
-    id: 3,
-    name: 'Asian Salmon Stir-Fry',
-    description: 'Crispy salmon with colorful vegetables',
-    image: 'https://images.pexels.com/photos/1516415/pexels-photo-1516415.jpeg?auto=compress&cs=tinysrgb&w=600',
-    time: 20,
-    calories: 380,
-    servings: 2,
-    difficulty: 'Medium',
-    tags: ['Quick', 'Asian'],
-  },
-  {
-    id: 4,
-    name: 'Classic Egg Breakfast',
-    description: 'Fluffy scrambled eggs with toast',
-    image: 'https://images.pexels.com/photos/27221310/pexels-photo-27221310.jpeg?auto=compress&cs=tinysrgb&w=600',
-    time: 15,
-    calories: 320,
-    servings: 1,
-    difficulty: 'Easy',
-    tags: ['Breakfast'],
-  },
-  {
-    id: 5,
-    name: 'Fresh Garden Salad',
-    description: 'Crisp mixed greens with seasonal vegetables',
-    image: 'https://images.pexels.com/photos/3743537/pexels-photo-3743537.jpeg?auto=compress&cs=tinysrgb&w=600',
-    time: 10,
-    calories: 180,
-    servings: 2,
-    difficulty: 'Easy',
-    tags: ['Healthy', 'Low Calorie'],
-  },
-  {
-    id: 6,
-    name: 'Grilled Cheese Sandwich',
-    description: 'Melty cheddar between golden crispy bread',
-    image: 'https://images.pexels.com/photos/14941252/pexels-photo-14941252.jpeg?auto=compress&cs=tinysrgb&w=600',
-    time: 12,
-    calories: 420,
-    servings: 1,
-    difficulty: 'Easy',
-    tags: ['Comfort Food', 'Quick'],
-  },
-];
-
-interface MealPlanDay {
-  day: string;
-  breakfast: Recipe | null;
-  lunch: Recipe | null;
-  dinner: Recipe | null;
-}
-
-const initialMealPlan: MealPlanDay[] = [
-  { day: 'Mon', breakfast: recipes[3], lunch: null, dinner: recipes[0] },
-  { day: 'Tue', breakfast: null, lunch: recipes[1], dinner: recipes[2] },
-  { day: 'Wed', breakfast: recipes[3], lunch: recipes[3], dinner: recipes[0] },
-  { day: 'Thu', breakfast: null, lunch: recipes[1], dinner: recipes[2] },
-  { day: 'Fri', breakfast: recipes[3], lunch: null, dinner: recipes[0] },
-  { day: 'Sat', breakfast: recipes[3], lunch: recipes[1], dinner: recipes[2] },
-  { day: 'Sun', breakfast: null, lunch: null, dinner: recipes[0] },
-];
+const recipes = rawRecipes as Recipe[];
 
 const mealTypeConfig = {
   breakfast: {
@@ -348,8 +267,8 @@ function RecipePickerModal({
 }
 
 export function Planner() {
+  const { mealPlan: plan, setMealAt, generateRandomPlan } = usePantry();
   const [weekOffset, setWeekOffset] = useState(0);
-  const [plan, setPlan] = useState<MealPlanDay[]>(initialMealPlan);
   const [picker, setPicker] = useState<{ dayIndex: number; type: keyof typeof mealTypeConfig } | null>(null);
 
   const openPicker = (dayIndex: number, type: keyof typeof mealTypeConfig) => {
@@ -358,26 +277,16 @@ export function Planner() {
 
   const handleSelectRecipe = (recipe: Recipe) => {
     if (!picker) return;
-    setPlan((prev) =>
-      prev.map((day, idx) => (idx === picker.dayIndex ? { ...day, [picker.type]: recipe } : day))
-    );
+    setMealAt(picker.dayIndex, picker.type, recipe as unknown as MealPlanDay['breakfast']);
     setPicker(null);
   };
 
   const handleRemoveMeal = (dayIndex: number, type: keyof typeof mealTypeConfig) => {
-    setPlan((prev) => prev.map((day, idx) => (idx === dayIndex ? { ...day, [type]: null } : day)));
+    setMealAt(dayIndex, type, null);
   };
 
   const handleGeneratePlan = () => {
-    const randomRecipe = () => recipes[Math.floor(Math.random() * recipes.length)];
-    setPlan((prev) =>
-      prev.map((day) => ({
-        ...day,
-        breakfast: randomRecipe(),
-        lunch: randomRecipe(),
-        dinner: randomRecipe(),
-      }))
-    );
+    generateRandomPlan();
   };
 
   // Calculate week dates

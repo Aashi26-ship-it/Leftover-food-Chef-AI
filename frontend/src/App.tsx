@@ -10,6 +10,10 @@ import { Pantry } from './pages/Pantry';
 import { Recipes } from './pages/Recipes';
 import { Shopping } from './pages/Shopping';
 import { Planner } from './pages/Planner';
+import { Login } from './pages/Login';
+import { Register } from './pages/Register';
+import { PantryProvider } from './context/PantryContext';
+import { AuthProvider } from './context/AuthContext';
 
 function AppContent() {
   const [darkMode, setDarkMode] = useState(() => {
@@ -86,6 +90,22 @@ function AppContent() {
                 </PageTransition>
               }
             />
+            <Route
+              path="/login"
+              element={
+                <PageTransition>
+                  <Login />
+                </PageTransition>
+              }
+            />
+            <Route
+              path="/register"
+              element={
+                <PageTransition>
+                  <Register />
+                </PageTransition>
+              }
+            />
           </Routes>
         </AnimatePresence>
 
@@ -98,9 +118,13 @@ function AppContent() {
 
 function App() {
   return (
-    <Router>
-      <AppContent />
-    </Router>
+    <AuthProvider>
+      <PantryProvider>
+        <Router>
+          <AppContent />
+        </Router>
+      </PantryProvider>
+    </AuthProvider>
   );
 }
 
