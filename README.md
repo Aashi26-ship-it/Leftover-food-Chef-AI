@@ -219,10 +219,17 @@ Add screenshots of:
 ## 👩‍💻 Team Members
 
 - Aashi Singh
+<<<<<<< HEAD
 - Ragini
 - *(Add remaining team members)*
 
 ---
+=======
+- Ragini Soni
+- Shakti Rajora
+- Manshi Kadam
+- Mudu sunandita
+>>>>>>> 07f5e18c0f884b905ad46d187a14d2ae32967ac1
 
 ## 📖 Project Objective
 
@@ -234,7 +241,10 @@ The primary objective of this project is to reduce food waste by helping users p
 
 This project is developed for educational purposes as part of a university project.
 
+<<<<<<< HEAD
 ---
+=======
+>>>>>>> 07f5e18c0f884b905ad46d187a14d2ae32967ac1
 
 ## ⭐ Acknowledgements
 
@@ -250,4 +260,8 @@ This project is developed for educational purposes as part of a university proje
 
 ## ❤️ Thank You
 
+<<<<<<< HEAD
 If you found this project useful, consider giving it a ⭐ on GitHub.
+=======
+If you found this project useful, consider giving it a ⭐ on GitHub.
+>>>>>>> 07f5e18c0f884b905ad46d187a14d2ae32967ac1

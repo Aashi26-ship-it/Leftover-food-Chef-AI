@@ -44,16 +44,23 @@ async def lifespan(_: FastAPI):
 
 
 app = FastAPI(title="Leftover Food Chef AI", version="1.0.0", lifespan=lifespan)
+<<<<<<< HEAD
 
 _default_origins = [
+=======
+allowed_origins = [
+>>>>>>> 07f5e18c0f884b905ad46d187a14d2ae32967ac1
     "https://leftover-food-chef-cdii1yt7t-aashi26-ship-its-projects.vercel.app",
     "http://localhost:3000",
     "http://localhost:5173",
 ]
+<<<<<<< HEAD
 _cors_env = os.getenv("CORS_ORIGINS", "").strip()
 allowed_origins = (
     [origin.strip() for origin in _cors_env.split(",") if origin.strip()] if _cors_env else _default_origins
 )
+=======
+>>>>>>> 07f5e18c0f884b905ad46d187a14d2ae32967ac1
 
 app.add_middleware(
     CORSMiddleware,
